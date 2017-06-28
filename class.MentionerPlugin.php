@@ -7,7 +7,7 @@ require_once (INCLUDE_DIR . 'class.signal.php');
  * TODO: use @email@address.com it will find that user/agent via address lookup, strip the first @ and add them as a a collaborator.
  */
 class MentionerPlugin extends Plugin {
-	const DEBUG = TRUE;
+	const DEBUG = FALSE;
 	
 	/**
 	 * Run on every instantiation of osTicket..
@@ -18,7 +18,7 @@ class MentionerPlugin extends Plugin {
 	 * @see Plugin::bootstrap()
 	 */
 	function bootstrap() {
-		Signal::connect ( 'threadentry.created', function (ThreadEntry $entry) {			
+		Signal::connect ( 'threadentry.created', function (ThreadEntry $entry) {
 			// Get the contents of the ThreadEntryBody to check the text
 			$text = $entry->getBody ()->getClean ();
 			
@@ -34,24 +34,25 @@ class MentionerPlugin extends Plugin {
 						foreach ( $mentions as $idx => $name ) {
 							$name = ltrim ( $name, '@' );
 							
-							// Check for Staff first? Can you even add staff? Shit.
+							// Check for Staff with that name: Can you even add staff? Nope.. only Users.
 							$s = Staff::lookup ( $name );
 							
 							if ($s instanceof Staff) {
-								// We'll craft a User to match
+								// Craft a User to match the Staff account:
 								$vars = array (
 										'name' => $name,
 										'email' => $s->getEmail () 
 								);
 								$o = User::fromVars ( $vars, true );
 							} else {
+								// It's not a Staff/Agent account, maybe it's a user, or a Staff-User we've previously created:
 								$o = User::lookup ( $name );
 							}
 							
 							if ($o) {
-								// Attempt to add the collaborator
+								// Attempt to add the collaborator to the thread (won't duplicate by default)
 								$vars = $errors = array ();
-								$entry->getThread()->addCollaborator ( $o, $vars, $errors, true );
+								$entry->getThread ()->addCollaborator ( $o, $vars, $errors, true );
 							}
 						}
 					}
