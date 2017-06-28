@@ -18,14 +18,7 @@ class MentionerPlugin extends Plugin {
 	 * @see Plugin::bootstrap()
 	 */
 	function bootstrap() {
-		Signal::connect ( 'threadentry.created', function (ThreadEntry $entry) {
-			// There's possibly a more performant way to do this.
-			//$ticket_id = Thread::objects ()->filter ( array (
-			//		'id' => $entry->getThreadId () 
-			//) )->values_flat ( 'object_id' )->first () [0]; 
-			
-			//$t = Ticket::lookup ( $ticket_id );
-			
+		Signal::connect ( 'threadentry.created', function (ThreadEntry $entry) {			
 			// Get the contents of the ThreadEntryBody to check the text
 			$text = $entry->getBody ()->getClean ();
 			
