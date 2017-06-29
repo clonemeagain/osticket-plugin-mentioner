@@ -80,7 +80,7 @@ class MentionerPlugin extends Plugin {
 			if ($ticket->getOwnerId () == $entry->getUserId ()) {
 				if (self::DEBUG)
 					error_log ( "Skipping notification because the owner posted." );
-				return;
+				// return;
 			}
 		} else {
 			// An agent posted, skip that agent from being notified
@@ -146,7 +146,7 @@ class MentionerPlugin extends Plugin {
 			$matches = array ();
 			
 			// regex pinched from: https://stackoverflow.com/a/10384251/276663
-			if (preg_match_all ( '/(^|\s)(@\w+)/i', $text, $matches ) !== FALSE) {
+			if (preg_match_all ( '/(^|\s)@([\.\w]+)/i', $text, $matches ) !== FALSE) {
 				if (count ( $matches [2] )) {
 					$mentions = array_unique ( $matches [2] );
 					
@@ -156,7 +156,6 @@ class MentionerPlugin extends Plugin {
 					$email_domain = $c->get ( 'email-domain' ); // (string)
 					
 					foreach ( $mentions as $idx => $name ) {
-						$name = ltrim ( $name, '@' ); // remove @ prefix
 						$name = substr ( $name, 0, self::MAX_LENGTH_NAME ); // restrict the length of $name, prevent overflow
 						
 						if (! $name)
@@ -177,6 +176,15 @@ class MentionerPlugin extends Plugin {
 									continue;
 								}
 							}
+						}
+						
+						if (strpos ( $name, '.' ) !== FALSE) {
+							// Firstname.Lastname ! :-)
+							list ( $fn, $ln ) = explode ( '.', $name );
+							$staff = Staff::lookup ( array (
+									'firstname' => $fn,
+									'lastname' => $ln 
+							) );
 						}
 						
 						// Check for Staff with that name (skip if email matched)
