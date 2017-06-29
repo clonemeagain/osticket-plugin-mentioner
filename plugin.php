@@ -1,6 +1,6 @@
 <?php return array(
  'id' => 'clonemeagain:mentioner', # notrans
- 'version' => '1.1',
+ 'version' => '1.2',
  'name' => 'Mentioner',
  'author' => 'clonemeagain@gmail.com',
  'description' => 'Notices @mentions and those names as collaborators.',

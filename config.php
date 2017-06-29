@@ -28,10 +28,11 @@ class MentionerPluginConfig extends PluginConfig {
 		list ( $__, $_N ) = self::translate ();
 		return array (
 				'sb1' => new SectionBreakField ( [ 
-						'label' => 'Who can be mentioned?' 
+						'label' => $__ ( 'Who can be @mentioned?' ),
+						'hint' => $__ ( 'By default, all Agents and Users are avaialble' ) 
 				] ),
 				'agents-only' => new BooleanField ( [ 
-						'label' => $__ ( 'Only allow mentions from Agents' ) 
+						'label' => $__ ( 'Only allow mentions from Agents (staff)' ) 
 				] ),
 				'sb' => new SectionBreakField ( [ 
 						'label' => $__ ( 'Match email addresses?' ),
