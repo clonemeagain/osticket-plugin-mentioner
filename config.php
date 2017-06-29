@@ -32,9 +32,10 @@ class MentionerPluginConfig extends PluginConfig {
 						'hint' => $__ ( 'By default, all Agents and Users are avaialble' ) 
 				] ),
 				'agents-only' => new BooleanField ( [ 
-						'label' => $__ ( 'Only allow mentions from Agents (staff)' ) 
+						'label' => $__ ( 'Only allow mentions from Agents (staff)' ),
+						'hint' => $__ ( 'Default is to allow all.' ) 
 				] ),
-				'sb' => new SectionBreakField ( [ 
+				'sb2' => new SectionBreakField ( [ 
 						'label' => $__ ( 'Match email addresses?' ),
 						'hint' => $__ ( 'If you put domain.com here, we\'ll try and match @user as user@domain.com and lookup their account.' ) 
 				] ),

@@ -8,6 +8,7 @@ require_once ('config.php');
  * Checks @email prefix for admin-defined domain.com it will find that user/agent via address lookup, then add them as a a collaborator.
  */
 class MentionerPlugin extends Plugin {
+	const DEBUG = FALSE;
 	/**
 	 * Which config to use (in config.php)
 	 *
@@ -26,8 +27,108 @@ class MentionerPlugin extends Plugin {
 	 */
 	function bootstrap() {
 		Signal::connect ( 'threadentry.created', function (ThreadEntry $entry) {
+			if (self::DEBUG) {
+				error_log ( "ThreadEntry detected, checking for mentions and notifying staff." );
+			}
 			$this->checkThreadTextForMentions ( $entry );
+			$this->notifyStaff ( $entry );
 		} );
+	}
+	
+	/**
+	 * By default, Staff added as User-Collaborators only receive notifications when the original ticket creator sends a reply
+	 * This isn't great..
+	 * what if a collaborator sends a message? or a private note is sent that they should see?
+	 *
+	 * Code copied from Ticket::notifyCollaborators() and heavily modified
+	 *
+	 * @param ThreadEntry $entry        	
+	 */
+	private function notifyStaff(ThreadEntry $entry) {
+		global $cfg;
+		
+		// aquire ticket from $entry
+		$ticket_id = Thread::objects ()->filter ( [ 
+				'id' => $entry->getThreadId () 
+		] )->values_flat ( 'object_id' )->first () [0];
+		
+		// Need to pass the array, so we bypass the ticket-cache.. we want a fresh object with all the new collaborators..
+		$ticket = Ticket::lookup ( [ 
+				'ticket_id' => $ticket_id 
+		] );
+		// Get metadata
+		$recipients = $ticket->getRecipients ();
+		$dept = $ticket->getDept ();
+		$tpl = ($dept) ? $dept->getTemplate () : $cfg->getDefaultTemplate ();
+		$msg = $tpl->getNoteAlertMsgTemplate ();
+		$email = ($dept) ? $dept->getEmail () : $cfg->getDefaultEmail ();
+		$skip = array ();
+		
+		// Figure out if we need to send them.
+		if ($entry->isSystem ()) {
+			// System!
+			$poster = $entry->getPoster (); // No idea what that returns.
+			$skip [$ticket->getOwnerId ()] = true; // They don't need system messages.
+				                                       // Actually, does anyone need system messages?
+				                                       // return;
+		} elseif ($entry->getUserId ()) {
+			// A user sent us a message
+			$poster = $entry->getUser ();
+			$skip [$entry->getUserId ()] = true;
+			
+			// If the poster is the ticket owner, then bail, the normal message notification will fire (if enabled)
+			if ($ticket->getOwnerId () == $entry->getUserId ()) {
+				if (self::DEBUG)
+					error_log ( "Skipping notification because the owner posted." );
+				return;
+			}
+		} else {
+			// An agent posted, skip that agent from being notified
+			$poster = $entry->getStaff ();
+			$skip [$entry->getStaffId ()] = true;
+		}
+		
+		if ($entry instanceof NoteThreadEntry) {
+			// Figure out who needs to receive this,
+			// we want User's who are actually Agent's to get them, nobody else
+			foreach ( $recipients as $r ) {
+				if ($staff_object = Staff::lookup ( $r->getEmail () )) {
+					// We want them to get it. They just happen to have a User account with the same email address.
+					if (self::DEBUG) {
+						error_log ( "We'll be emailing {$r->getName()}" );
+					}
+					continue;
+				}
+				// Otherwise, rightly, remove them.
+				$skip [$r->getUserId ()] = true;
+				if (self::DEBUG) {
+					error_log ( "Removing {$r->getName()} from notification list." );
+				}
+			}
+		}
+		
+		// Build a message to notify each collaborator
+		$vars = [ 
+				'message' => ( string ) $entry,
+				'poster' => $poster ?: _S ( 'A collaborator' ) 
+		];
+		
+		$msg = $ticket->replaceVars ( $msg->asArray (), $vars );
+		
+		$attachments = $cfg->emailAttachments () ? $entry->getAttachments () : array ();
+		$options = [ 
+				'thread' => $entry 
+		];
+		
+		foreach ( $recipients as $recipient ) {
+			// Skip the skippable
+			if (isset ( $skip [$recipient->getUserId ()] ))
+				continue;
+			$notice = $ticket->replaceVars ( $msg, array (
+					'recipient' => $recipient 
+			) );
+			$email->send ( $recipient, $notice ['subj'], $notice ['body'], $attachments, $options );
+		}
 	}
 	
 	/**
