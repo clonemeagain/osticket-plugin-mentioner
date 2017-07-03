@@ -27,17 +27,17 @@ class MentionerPluginConfig extends PluginConfig {
 	function getOptions() {
 		list ( $__, $_N ) = self::translate ();
 		return array (
-				'sb1' => new SectionBreakField ( [ 
-						'label' => $__ ( 'Who can be @mentioned?' ),
+				'sbm' => new SectionBreakField ( [ 
+						'label' => $__ ( 'Who can be @mentioned and added as a Collaborator?' ),
 						'hint' => $__ ( 'By default, all Agents and Users are avaialble' ) 
 				] ),
 				'agents-only' => new BooleanField ( [ 
 						'label' => $__ ( 'Only allow mentions from Agents (staff)' ),
-						'hint' => $__ ( 'Default is to allow all.' ) 
+						'hint' => $__ ( 'Default is to allow Agents & Users.' ) 
 				] ),
-				'sb2' => new SectionBreakField ( [ 
+				'sbe' => new SectionBreakField ( [ 
 						'label' => $__ ( 'Match email addresses?' ),
-						'hint' => $__ ( 'If you put domain.com here, we\'ll try and match @user as user@domain.com and lookup their account.' ) 
+						'hint' => $__ ( 'If you put domain.com here, we\'ll try and match @user as user@domain.com and lookup their account (also works for #mention).' ) 
 				] ),
 				'email-domain' => new TextboxField ( [ 
 						'label' => $__ ( 'Which domains to match emails for?' ),
@@ -45,7 +45,42 @@ class MentionerPluginConfig extends PluginConfig {
 								'size' => 40,
 								'length' => 256 
 						) 
-				] ) 
+				] ),
+				'sbh' => new SectionBreakField ( [ 
+						'label' => $__ ( 'Notice #mentions as instant-notifications' ),
+						'hint' => $__ ( 'Doesn\'t add as a collaborator, just notifies.' ),
+						'default' => TRUE 
+				] ),
+				'notice-hash' => new BooleanField ( [ 
+						'label' => $__ ( 'Notice #Mentions' ),
+						'hint' => $__ ( 'Sends notices to staff mentioned with #name' ) 
+				] ),
+				'notice-subject' => new TextboxField ( [ 
+						'label' => $__ ( 'Notification Template: Subject' ),
+						'hint' => $__ ( 'Subject of the notfication message' ),
+						'default' => $__ ( 'You were mentioned in ticket #%{ticket.number}' ),
+						'configuration' => array (
+								'size' => 40,
+								'length' => 256 
+						) 
+				] ),
+				'notice-template' => new TextareaField ( [ 
+						'label' => $__ ( 'Notification Template: Message' ),
+						'hint' => $__ ( 'Use variables the same as Internal Note alert' ),
+						'default' => '
+<h3><strong>Hi %{recipient.name.first},</strong></h3>
+						
+<p>%{poster.name.short} mentioned you in ticket <a href="%%7Bticket.staff_link%7D">#%{ticket.number}</a></p>
+<table><tbody>
+<tr> <td> <strong>From</strong>: </td> <td> %{ticket.name} </td> </tr>
+<tr> <td> <strong>Subject</strong>: </td> <td> %{ticket.subject} </td> </tr> </tbody></table>
+<br /> %{comments} <br /><br /><hr />
+<p>To view/respond to the ticket, please <a href="%%7Bticket.staff_link%7D"><span style="color:rgb(84, 141, 212)">login</span></a> to the support ticket system<br />
+<em style="font-size:small">Your friendly Customer Support System</em>
+<br /><img src="cid:b56944cb4722cc5cda9d1e23a3ea7fbc" alt="Powered by osTicket" width="126" height="19" style="width:126px" />
+' 
+				] )  // not sure if this src id will work for others.. might be better as a plaintext message template.
+		
 		);
 	}
 }
