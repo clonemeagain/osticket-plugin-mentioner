@@ -122,6 +122,11 @@ class MentionerPlugin extends Plugin {
 	private function notifyCollaborators(ThreadEntry $entry) {
 		global $cfg;
 		
+		if (! $this->getConfig ()->get ( 'override-notifications' )) {
+			// Admin doesn't want this
+			return;
+		}
+		
 		// Get metadata
 		$ticket = $this->getTicket ( $entry );
 		$recipients = $ticket->getRecipients ();
@@ -173,7 +178,7 @@ class MentionerPlugin extends Plugin {
 			}
 		} else {
 			// MessageThreadEntries..
-			// Skip the original author, they'll already get notified 
+			// Skip the original author, they'll already get notified
 			$skip [$ticket->getOwnerId ()] = true;
 		}
 		
@@ -307,7 +312,7 @@ class MentionerPlugin extends Plugin {
 	 */
 	private function addStaffCollaborator(ThreadEntry $entry, Staff $staff) {
 		$vars = array (
-				'name' => $staff->getName(),
+				'name' => $staff->getName (),
 				'email' => $staff->getEmail () 
 		);
 		$user = User::fromVars ( $vars, true );

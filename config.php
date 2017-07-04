@@ -29,11 +29,19 @@ class MentionerPluginConfig extends PluginConfig {
 		return array (
 				'sbm' => new SectionBreakField ( [ 
 						'label' => $__ ( 'Who can be @mentioned and added as a Collaborator?' ),
-						'hint' => $__ ( 'By default, all Agents and Users are avaialble' ) 
+						'hint' => $__ ( 'By default, all Agents and Users are available to be @mentioned' ) 
 				] ),
 				'agents-only' => new BooleanField ( [ 
 						'label' => $__ ( 'Only allow mentions from Agents (staff)' ),
-						'hint' => $__ ( 'Default is to allow Agents & Users.' ) 
+						'hint' => $__ ( 'Restrict checks to Staff only' ) 
+				] ),
+				'on' => new SectionBreakField ( [ 
+						'label' => $__ ( 'Override Notifications' ),
+						'hint' => 'Ensure all collaborators receive notifications about all messages, if collaborator is Staff, they will receive notifications about internal notes.' 
+				] ),
+				'override-notifications' => new BooleanField ( [ 
+						'label' => $__ ( "Override Notifications" ),
+						'hint' => $__ ( 'Can be dangerous..' ) 
 				] ),
 				'sbe' => new SectionBreakField ( [ 
 						'label' => $__ ( 'Match email addresses?' ),
