@@ -37,8 +37,77 @@ class MentionerPlugin extends Plugin {
 				error_log ( "ThreadEntry detected, checking for mentions and notifying staff." );
 			}
 			$this->checkThreadTextForMentions ( $entry );
-			$this->notifyStaff ( $entry );
+			$this->notifyCollaborators ( $entry );
 		} );
+	}
+	
+	/**
+	 * Hunt through the text of a ThreadEntry's body text for mentions of Staff or Users
+	 *
+	 * @param ThreadEntry $entry        	
+	 */
+	private function checkThreadTextForMentions(ThreadEntry $entry) {
+		// Get the contents of the ThreadEntryBody to check the text
+		$text = $entry->getBody ()->getClean ();
+		
+		// Match every instance of @name in the thread text
+		if ($mentions = $this->getMentions ( $text, '@' )) {
+			// Each unique name will get added as a Collaborator to the ticket thread.
+			foreach ( $mentions as $idx => $name ) {
+				$this->addCollaborator ( $entry, $name );
+			}
+		}
+		
+		// Match every instance of #name in the text
+		if ($this->getConfig ()->get ( 'notice-hash' ) && $mentions = $this->getMentions ( $text, '#' )) {
+			// Build a recipient list, each unique name will get checked for Staff-ishness
+			$stafflist = new UserList ();
+			foreach ( $mentions as $idx => $name ) {
+				$staff = $this->convertName ( $name, TRUE );
+				if ($staff instanceof Staff) {
+					if (self::DEBUG) {
+						error_log ( "Adding {$staff->getName()} to #notifications list." );
+					}
+					$stafflist->add ( $staff );
+				}
+			}
+			if (count ( $stafflist )) {
+				// Send the recipient list a message about the notice.
+				$this->notifyStaffOfMention ( $entry, $stafflist );
+			}
+		}
+	}
+	
+	/**
+	 * Looks for a Agent/User with name: $name
+	 *
+	 * @param string $name        	
+	 * @param boolean $staff_only
+	 *        	(don't look in User table)
+	 * @return Staff|null|User
+	 */
+	private function convertName($name, $staff_only = false) {
+		// Look for @prefix as prefix@domain.com etc
+		if ($m = $this->matchEmailDomain ( $name )) {
+			if ($m instanceof Staff) {
+				return $m;
+			} elseif (! $staff_only && $m) {
+				return $m;
+			}
+		}
+		// Look for first.last
+		if ($staff = $this->matchFirstLast ( $name ))
+			return $staff;
+		
+		// Check for Staff via username
+		if ($staff = Staff::lookup ( $name ))
+			return $staff;
+		
+		// It's not a Staff/Agent account, maybe it's a User:
+		if (! $staff_only && $user = User::lookup ( $name ))
+			return $user;
+		
+		return null;
 	}
 	
 	/**
@@ -50,7 +119,7 @@ class MentionerPlugin extends Plugin {
 	 *
 	 * @param ThreadEntry $entry        	
 	 */
-	private function notifyStaff(ThreadEntry $entry) {
+	private function notifyCollaborators(ThreadEntry $entry) {
 		global $cfg;
 		
 		// Get metadata
@@ -102,15 +171,23 @@ class MentionerPlugin extends Plugin {
 					error_log ( "Removing {$r->getName()} from notification list." );
 				}
 			}
+		} else {
+			// MessageThreadEntries..
+			// Skip the original author, they'll already get notified 
+			$skip [$ticket->getOwnerId ()] = true;
 		}
 		
 		// Build a message to notify each collaborator
 		$vars = [ 
 				'message' => ( string ) $entry,
 				'poster' => $poster ?: _S ( 'A collaborator' ),
-				'comments' => $entry->getBody ()->getClean () 
+				'note' => array (
+						'title' => $entry->getTitle (),
+						'message' => $entry->getBody ()->getClean () 
+				) 
 		];
 		
+		// Use the ticket to convert the template to a message: (replaces variables with content)
 		$msg = $ticket->replaceVars ( $msg->asArray (), $vars );
 		
 		$attachments = $cfg->emailAttachments () ? $entry->getAttachments () : array ();
@@ -133,103 +210,35 @@ class MentionerPlugin extends Plugin {
 	}
 	
 	/**
-	 * Hunt through the text of a ThreadEntry's body text for mentions of Staff or Users
-	 *
-	 * @param ThreadEntry $entry        	
-	 */
-	private function checkThreadTextForMentions(ThreadEntry $entry) {
-		// Get the contents of the ThreadEntryBody to check the text
-		$text = $entry->getBody ()->getClean ();
-		$match_staff_only = $this->getConfig ()->get ( 'agents-only' );
-		
-		// Match every instance of @name in the thread text
-		if ($mentions = $this->getMentions ( $text, '@' )) {
-			foreach ( $mentions as $idx => $name ) {
-				// Look for @prefix as prefix@domain.com etc
-				if ($m = $this->matchEmailDomain ( $name )) {
-					if ($m instanceof Staff) {
-						$this->addStaffCollaborator ( $entry, $m );
-					} elseif (! $match_staff_only && $m instanceof User) {
-						$this->addCollaborator ( $entry, $m );
-					}
-					continue;
-				}
-				$staff = $this->matchFirstLast ( $name );
-				
-				// Check for Staff with that name
-				if (! $staff)
-					$staff = Staff::lookup ( $name );
-				
-				if ($staff instanceof Staff) {
-					$this->addStaffCollaborator ( $entry, $staff );
-				} elseif (! $match_staff_only) {
-					// It's not a Staff/Agent account, maybe it's a User:
-					$user = User::lookup ( $name );
-					if ($user instanceof User) {
-						$this->addCollaborator ( $entry, $user );
-					}
-				}
-			}
-		}
-		
-		// Match every instance of #name in the thread text
-		if ($this->getConfig ()->get ( 'notice-hash' ) && $mentions = $this->getMentions ( $text, '#' )) {
-			$stafflist = new UserList ();
-			foreach ( $mentions as $idx => $name ) {
-				// Look for @prefix as prefix@domain.com etc
-				if ($m = $this->matchEmailDomain ( $name )) {
-					if ($m instanceof Staff) {
-						$this->addStaffCollaborator ( $entry, $m );
-					} elseif (! $match_staff_only && $m instanceof User) {
-						$this->addCollaborator ( $entry, $m );
-					}
-					continue;
-				}
-				$staff = $this->matchFirstLast ( $name );
-				
-				// Check for Staff with that name
-				if (! $staff)
-					$staff = Staff::lookup ( $name );
-				
-				if ($staff instanceof Staff) {
-					// Send a message to them telling them about the mention
-					$stafflist->add ( $staff );
-				}
-			}
-			if (count ( $stafflist )) {
-				$this->notifyStaffOfMention ( $entry, $stafflist );
-			}
-		}
-	}
-	/**
-	 * Send a body of text, and a prefix character to match with.
-	 * It returns a list of matching words that are prefixed with that char.
+	 * Looks through $text & finds a list of words that are prefixed with $prefix char.
 	 *
 	 * Ensures names are not longer than MAX_LENGTH_NAME
 	 *
 	 * @param string $text        	
-	 * @param string $type        	
+	 * @param string $prefix        	
 	 * @return array either of names or false if no matches.
 	 */
-	private function getMentions($text, $type = '@') {
+	private function getMentions($text, $prefix = '@') {
 		$matches = $mentions = array ();
-		if (preg_match_all ( "/(^|\s)$type([\.\w]+)/i", $text, $matches ) !== FALSE) {
+		if (preg_match_all ( "/(^|\s)?$prefix([\.\w]+)/i", $text, $matches ) !== FALSE) {
 			if (count ( $matches [2] )) {
 				$mentions = array_map ( function ($name) {
-					// restrict length of $name's, prevent overflow
+					// restricts length of $name's, prevent overflow
 					return substr ( $name, 0, self::MAX_LENGTH_NAME );
 				}, array_unique ( $matches [2] ) );
 			}
 		}
 		if (self::DEBUG) {
-			error_log ( "Matched $type " . count ( $mentions ) . ' matches.' );
+			error_log ( "Matched $prefix " . count ( $mentions ) . ' matches.' );
 			error_log ( print_r ( $mentions, true ) );
 		}
-		return $mentions ?: null;
+		return isset ( $mentions [0] ) ? $mentions : null; // fastest validator ever.
 	}
 	
 	/**
 	 * Finds a Staff/User via their email prefix
+	 *
+	 * Requires admin to have configured email-domain config option.
 	 *
 	 * @param string $name        	
 	 * @return boolean|Staff|User
@@ -257,7 +266,7 @@ class MentionerPlugin extends Plugin {
 	}
 	
 	/**
-	 * Creates a Staff object from a string like: "firstname.lastname"
+	 * Find a Staff object from a string like: "firstname.lastname"
 	 *
 	 * @param string $name        	
 	 * @return NULL|Staff
@@ -274,40 +283,54 @@ class MentionerPlugin extends Plugin {
 	}
 	
 	/**
+	 * Adds someone to the ticket as a collaborator.
+	 *
+	 * @param ThreadEntry $entry        	
+	 * @param string $name        	
+	 */
+	private function addCollaborator(ThreadEntry $entry, $name) {
+		$actor = $this->convertName ( $name, $this->getConfig ()->get ( 'agents-only' ) );
+		if ($actor instanceof Staff) {
+			$this->addStaffCollaborator ( $entry, $actor );
+		} elseif (! $match_staff_only) {
+			if ($actor instanceof User) {
+				$this->addUserCollaborator ( $entry, $actor );
+			}
+		}
+	}
+	
+	/**
 	 * Craft/Fetch a User to match the Staff account and adds as User
 	 *
 	 * @param ThreadEntry $entry        	
 	 * @param Staff $staff        	
 	 */
 	private function addStaffCollaborator(ThreadEntry $entry, Staff $staff) {
-		//
 		$vars = array (
-				'name' => $name,
+				'name' => $staff->getName(),
 				'email' => $staff->getEmail () 
 		);
 		$user = User::fromVars ( $vars, true );
 		if (self::DEBUG)
 			error_log ( "Converting {$staff->getName()} to User" );
-		$this->addCollaborator ( $entry, $user );
+		$this->addUserCollaborator ( $entry, $user );
 	}
 	
 	/**
-	 * Adds a collaborating User to the ThreadEntry
+	 * Adds a collaborating User to the ThreadEntry (won't duplicate by default)
 	 *
 	 * @param ThreadEntry $entry        	
 	 * @param User $user        	
 	 */
-	private function addCollaborator(ThreadEntry $entry, User $user) {
-		// Attempt to add the collaborator to the thread (won't duplicate by default)
-		$vars = $errors = array ();
+	private function addUserCollaborator(ThreadEntry $entry, User $user) {
 		if (self::DEBUG)
 			error_log ( "Adding collaborator: {$user->getName()}" );
-		
+		$vars = $errors = array ();
 		$entry->getThread ()->addCollaborator ( $user, $vars, $errors, true );
 	}
 	
 	/**
-	 * Simply crafts an email to send to Staff members that they have been mentioned.
+	 * Crafts an email to send to Staff members that they have been mentioned.
 	 *
 	 * Uses custom message template defined in plugin config. :-)
 	 *
@@ -321,17 +344,17 @@ class MentionerPlugin extends Plugin {
 		$ticket = $this->getTicket ( $entry );
 		
 		$msg = new EmailTemplate ( 0 );
-		$msg->id = 'plugin-fake'; // Likely needs to be an integer..
-		                          
-		// Hack up some data that we might have properly used the admin stuff for, but didn't
+		$msg->id = 'plugin-fake';
+		
+		// Simulate correct EmailTemplate variables:
 		$msg->ht = [ 
-				'tpl_id' => PHP_INT_MAX -1, // dunno.. works. Figure it's unlikely any normal install would have that many templates.
-				'code_name' => 'cannedresponse', // trigger "ticket" root context for the VariableReplacer
+				'tpl_id' => PHP_INT_MAX - 1, // It's unlikely any normal install would have that many templates... famous last words
+				'code_name' => 'cannedresponse', // HACK: trigger "ticket" root context for the VariableReplacer
 				'subject' => $this->getConfig ()->get ( 'notice-subject' ),
-				'body' => $this->getConfig ()->get ( 'notice-template' ) ,
-				'updated' => time(),
+				'body' => $this->getConfig ()->get ( 'notice-template' ),
+				'updated' => time ()  // We're always updating this template.. :-)
 		];
-		$msg->_group = 3; //HTML Group
+		$msg->_group = 3; // HTML Group
 		
 		$dept = $ticket->getDept ();
 		$email = ($dept) ? $dept->getEmail () : $cfg->getDefaultEmail ();
@@ -343,14 +366,15 @@ class MentionerPlugin extends Plugin {
 				'poster' => $poster,
 				'comments' => $entry->getBody ()->getClean () 
 		];
-		// Use the ticket to convert the template to a message:
+		// Use the ticket to convert the template to a message: (replaces variables with content)
+		// Note: $msg->asArray returns subject as subj.. annoying
 		$msg = $ticket->replaceVars ( $msg->asArray (), $vars );
 		$attachments = $cfg->emailAttachments () ? $entry->getAttachments () : array ();
 		$options = [ 
 				'thread' => $entry,
 				'notice' => TRUE  // Automated notice, don't bounce back to me!
 		];
-		// Send the notice
+		// Send to each
 		foreach ( $recipients as $recipient ) {
 			$notice = $ticket->replaceVars ( $msg, array (
 					'recipient' => $recipient 
@@ -370,12 +394,12 @@ class MentionerPlugin extends Plugin {
 	private static function getTicket(ThreadEntry $entry) {
 		static $ticket;
 		if (! $ticket) {
-			// aquire ticket from $entry
+			// aquire ticket from $entry.. I suspect there is a more efficient way.
 			$ticket_id = Thread::objects ()->filter ( [ 
 					'id' => $entry->getThreadId () 
 			] )->values_flat ( 'object_id' )->first () [0];
 			
-			// Force lookup rather than cached data..
+			// Force lookup rather than use cached data..
 			$ticket = Ticket::lookup ( array (
 					'ticket_id' => $ticket_id 
 			) );
@@ -396,7 +420,7 @@ class MentionerPlugin extends Plugin {
 	}
 	
 	/**
-	 * Plugin seems to want this.
+	 * Plugins seem to want this.
 	 */
 	public function getForm() {
 		return array ();
