@@ -176,7 +176,13 @@ class MentionerPlugin extends Plugin {
 		if ($this->getConfig ()->get ( 'notice-hash' ) && $mentions = $this->getMentions ( $text, '#' )) {
 			$stafflist = new UserList ();
 			foreach ( $mentions as $idx => $name ) {
-				if ($this->matchEmailDomain ( $name )) {
+				// Look for @prefix as prefix@domain.com etc
+				if ($m = $this->matchEmailDomain ( $name )) {
+					if ($m instanceof Staff) {
+						$this->addStaffCollaborator ( $entry, $m );
+					} elseif (! $match_staff_only && $m instanceof User) {
+						$this->addCollaborator ( $entry, $m );
+					}
 					continue;
 				}
 				$staff = $this->matchFirstLast ( $name );
