@@ -31,13 +31,27 @@ class MentionerPluginConfig extends PluginConfig {
 						'label' => $__ ( 'Who can be @mentioned and added as a Collaborator?' ),
 						'hint' => $__ ( 'By default, all Agents and Users are available to be @mentioned' ) 
 				] ),
+				'at-mentions' => new BooleanField ( [ 
+						'label' => $__ ( "Notice @mentions" ),
+						'hint' => $__ ( 'Enables adding @collaborators' ),
+						'default' => true 
+				] ),
 				'agents-only' => new BooleanField ( [ 
-						'label' => $__ ( 'Only allow mentions from Agents (staff)' ),
-						'hint' => $__ ( 'Restrict checks to Staff only' ) 
+						'label' => $__ ( 'Only allow @mentions OF Agents (staff)' ),
+						'hint' => $__ ( 'Add Agent collaborators only' ) 
+				] ),
+				'sba' => new SectionBreakField ( [ 
+						'label' => $__ ( "Who can make mentions?" ),
+						'hint' => $__ ( 'Default is all Users/Staff/System via email/web/API/scp' ) 
+				] ),
+				'by-agents-only' => new BooleanField ( [ 
+						'label' => $__ ( 'Only allow #/@ mentions BY Agents' ),
+						'hint' => $__ ( 'Uncheck to allow Users to mention' ),
+						'default' => TRUE 
 				] ),
 				'on' => new SectionBreakField ( [ 
 						'label' => $__ ( 'Override Notifications' ),
-						'hint' => 'Ensure all collaborators receive notifications about all messages, if collaborator is Staff, they will receive notifications about internal notes.' 
+						'hint' => 'Ensure collaborators receive notifications about all Messages, if collaborator is Staff, they will receive notifications about Notes.' 
 				] ),
 				'override-notifications' => new BooleanField ( [ 
 						'label' => $__ ( "Override Notifications" ),
@@ -55,8 +69,8 @@ class MentionerPluginConfig extends PluginConfig {
 						) 
 				] ),
 				'sbh' => new SectionBreakField ( [ 
-						'label' => $__ ( 'Notice #mentions as instant-notifications' ),
-						'hint' => $__ ( 'Doesn\'t add as a collaborator, just notifies.' ),
+						'label' => $__ ( 'Use #mentions for ticket notifications' ),
+						'hint' => $__ ( 'Doesn\'t add as a collaborator, just notifies: "You were mentioned!".' ),
 						'default' => TRUE 
 				] ),
 				'notice-hash' => new BooleanField ( [ 

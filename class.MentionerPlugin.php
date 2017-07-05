@@ -24,6 +24,15 @@ class MentionerPlugin extends Plugin {
 	const MAX_LENGTH_NAME = 128;
 	
 	/**
+	 * Define some class constants for the source of an entry
+	 *
+	 * @var integer
+	 */
+	const Staff = 0;
+	const User = 1;
+	const System = 2;
+	
+	/**
 	 * Run on every instantiation of osTicket..
 	 * needs to be concise
 	 *
@@ -49,9 +58,21 @@ class MentionerPlugin extends Plugin {
 	private function checkThreadTextForMentions(ThreadEntry $entry) {
 		// Get the contents of the ThreadEntryBody to check the text
 		$text = $entry->getBody ()->getClean ();
+		$config = $this->getConfig ();
+		
+		// Check if Poster has been allowed to make mentions:
+		if ($config->get ( 'by-agents-only' ) && $this->getPoster ( $entry ) != self::Staff) {
+			if (self::DEBUG) {
+				error_log ( "Ignoring action by non-staff due to configuration." );
+			}
+			return;
+		}
+		// Check if source method allowed
+		// On my test install (with 400k thread entries), almost 3k have a source sent.. it must be a manual thing
+		// $source = $entry->getSource ();
 		
 		// Match every instance of @name in the thread text
-		if ($mentions = $this->getMentions ( $text, '@' )) {
+		if ($this->getConfig ()->get ( 'at-mentions' ) && $mentions = $this->getMentions ( $text, '@' )) {
 			// Each unique name will get added as a Collaborator to the ticket thread.
 			foreach ( $mentions as $idx => $name ) {
 				$this->addCollaborator ( $entry, $name );
@@ -413,6 +434,21 @@ class MentionerPlugin extends Plugin {
 	}
 	
 	/**
+	 * Enumerate the originator of the message.
+	 *
+	 * @param ThreadEntry $entry        	
+	 * @return EntryPoster constant
+	 */
+	private function getPoster(ThreadEntry $entry) {
+		if ($entry->getStaffId ()) {
+			return self::Staff;
+		} elseif ($entry->getUserId ()) {
+			return self::User;
+		}
+		return self::System;
+	}
+	
+	/**
 	 * Required stub.
 	 *
 	 * {@inheritdoc}
@@ -431,3 +467,5 @@ class MentionerPlugin extends Plugin {
 		return array ();
 	}
 }
+
+
