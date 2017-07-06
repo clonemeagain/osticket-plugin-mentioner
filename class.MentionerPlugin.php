@@ -162,10 +162,10 @@ class MentionerPlugin extends Plugin {
 		// Figure out if we need to send them.
 		if ($entry->isSystem ()) {
 			// System!
-			$poster = $entry->getPoster (); // No idea what that returns.
-			$skip [$ticket->getOwnerId ()] = true; // They don't need system messages.
-				                                       // Actually, does anyone need system messages?
-				                                       // return;
+			// $poster = $entry->getPoster (); // No idea what that returns.
+			// $skip [$ticket->getOwnerId ()] = true; // They don't need system messages.
+			// Actually, does anyone need system messages?
+			return;
 		} elseif ($entry->getUserId ()) {
 			// A user sent us a message
 			$poster = $entry->getUser ();
