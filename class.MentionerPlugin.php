@@ -108,6 +108,10 @@ class MentionerPlugin extends Plugin {
 	 * @return Staff|null|User
 	 */
 	private function convertName($name, $staff_only = false) {
+	    // Names aren't numbers
+	    if(is_numeric($name))
+	        return null;
+	    
 		// Look for @prefix as prefix@domain.com etc
 		if ($m = $this->matchEmailDomain ( $name )) {
 			if ($m instanceof Staff) {
