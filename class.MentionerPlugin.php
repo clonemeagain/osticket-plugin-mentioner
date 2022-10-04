@@ -459,7 +459,7 @@ class MentionerPlugin extends Plugin {
 	 *
 	 * @see Plugin::uninstall()
 	 */
-	function uninstall() {
+	function uninstall(&$errors) {
 		$errors = array ();
 		parent::uninstall ( $errors );
 	}
