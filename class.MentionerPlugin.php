@@ -8,14 +8,62 @@ require_once ('config.php');
  * Checks @email prefix for admin-defined domain.com it will find that user/agent via address lookup, then add them as a a collaborator.
  */
 class MentionerPlugin extends Plugin {
-	const DEBUG = FALSE;
 	/**
 	 * Which config to use (in config.php)
 	 *
 	 * @var string
 	 */
 	public $config_class = 'MentionerPluginConfig';
+
+	var $backend;
 	
+	/**
+	 * Run on every instantiation of osTicket..
+	 * needs to be concise
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @see Plugin::bootstrap()
+	 */
+	function bootstrap() {
+		$backend = new MentionerBackend( $this->getConfig () );
+	}
+	
+	/**
+	 * Required stub.
+	 *
+	 * {@inheritdoc}
+	 *
+	 * @see Plugin::uninstall()
+	 */
+	function uninstall(&$errors) {
+		$errors = array ();
+		parent::uninstall ( $errors );
+	}
+	
+	/**
+	 * Plugins seem to want this.
+	 */
+	public function getForm() {
+		return array ();
+	}
+}
+
+class MentionerBackend {
+	var $config;
+	const DEBUG = FALSE;
+
+	function __construct($config) {
+		$this->config = $config;
+		Signal::connect ( 'threadentry.created', function (ThreadEntry $entry) {
+			if (self::DEBUG) {
+				error_log ( "ThreadEntry detected, checking for mentions and notifying staff." );
+			}
+			$this->checkThreadTextForMentions ( $entry );
+			$this->notifyCollaborators ( $entry );
+		} );
+	}
+
 	/**
 	 * To prevent buffer overflows, let's set the max length of a name we'll ever use to this:
 	 *
@@ -32,24 +80,7 @@ class MentionerPlugin extends Plugin {
 	const User = 1;
 	const System = 2;
 	
-	/**
-	 * Run on every instantiation of osTicket..
-	 * needs to be concise
-	 *
-	 * {@inheritdoc}
-	 *
-	 * @see Plugin::bootstrap()
-	 */
-	function bootstrap() {
-		Signal::connect ( 'threadentry.created', function (ThreadEntry $entry) {
-			if (self::DEBUG) {
-				error_log ( "ThreadEntry detected, checking for mentions and notifying staff." );
-			}
-			$this->checkThreadTextForMentions ( $entry );
-			$this->notifyCollaborators ( $entry );
-		} );
-	}
-	
+
 	/**
 	 * Hunt through the text of a ThreadEntry's body text for mentions of Staff or Users
 	 *
@@ -58,10 +89,9 @@ class MentionerPlugin extends Plugin {
 	private function checkThreadTextForMentions(ThreadEntry $entry) {
 		// Get the contents of the ThreadEntryBody to check the text
 		$text = $entry->getBody ()->getClean ();
-		$config = $this->getConfig ();
 		
 		// Check if Poster has been allowed to make mentions:
-		if ($config->get ( 'by-agents-only' ) && $this->getPoster ( $entry ) != self::Staff) {
+		if ($this->config->get ( 'by-agents-only' ) && $this->getPoster ( $entry ) != self::Staff) {
 			if (self::DEBUG) {
 				error_log ( "Ignoring action by non-staff due to configuration." );
 			}
@@ -72,7 +102,7 @@ class MentionerPlugin extends Plugin {
 		// $source = $entry->getSource ();
 		
 		// Match every instance of @name in the thread text
-		if ($this->getConfig ()->get ( 'at-mentions' ) && $mentions = $this->getMentions ( $text, '@' )) {
+		if ($this->config->get ( 'at-mentions' ) && $mentions = $this->getMentions ( $text, '@' )) {
 			// Each unique name will get added as a Collaborator to the ticket thread.
 			foreach ( $mentions as $idx => $name ) {
 				$this->addCollaborator ( $entry, $name );
@@ -80,7 +110,7 @@ class MentionerPlugin extends Plugin {
 		}
 		
 		// Match every instance of #name in the text
-		if ($this->getConfig ()->get ( 'notice-hash' ) && $mentions = $this->getMentions ( $text, '#' )) {
+		if ($this->config->get ( 'notice-hash' ) && $mentions = $this->getMentions ( $text, '#' )) {
 			// Build a recipient list, each unique name will get checked for Staff-ishness
 			$stafflist = new UserList ();
 			foreach ( $mentions as $idx => $name ) {
@@ -147,7 +177,7 @@ class MentionerPlugin extends Plugin {
 	private function notifyCollaborators(ThreadEntry $entry) {
 		global $cfg;
 		
-		if (! $this->getConfig ()->get ( 'override-notifications' )) {
+		if (! $this->config->get ( 'override-notifications' )) {
 			// Admin doesn't want this
 			return;
 		}
@@ -276,7 +306,7 @@ class MentionerPlugin extends Plugin {
 	private function matchEmailDomain($name) {
 		static $email_domain;
 		if (! isset ( $email_domain )) {
-			$email_domain = $this->getConfig ()->get ( 'email-domain' );
+			$email_domain = $this->config->get ( 'email-domain' );
 		}
 		// TODO: Someone might want many domains here..
 		if ($email_domain) {
@@ -319,7 +349,7 @@ class MentionerPlugin extends Plugin {
 	 * @param string $name        	
 	 */
 	private function addCollaborator(ThreadEntry $entry, $name) {
-		$actor = $this->convertName ( $name, $this->getConfig ()->get ( 'agents-only' ) );
+		$actor = $this->convertName ( $name, $this->config->get ( 'agents-only' ) );
 		if ($actor instanceof Staff) {
 			$this->addStaffCollaborator ( $entry, $actor );
 		} elseif (! $match_staff_only) {
@@ -380,8 +410,8 @@ class MentionerPlugin extends Plugin {
 		$msg->ht = [ 
 				'tpl_id' => PHP_INT_MAX - 1, // It's unlikely any normal install would have that many templates... famous last words
 				'code_name' => 'cannedresponse', // HACK: trigger "ticket" root context for the VariableReplacer
-				'subject' => $this->getConfig ()->get ( 'notice-subject' ),
-				'body' => $this->getConfig ()->get ( 'notice-template' ),
+				'subject' => $this->config->get ( 'notice-subject' ),
+				'body' => $this->config->get ( 'notice-template' ),
 				'updated' => time ()  // We're always updating this template.. :-)
 		];
 		$msg->_group = 3; // HTML Group
@@ -450,25 +480,6 @@ class MentionerPlugin extends Plugin {
 			return self::User;
 		}
 		return self::System;
-	}
-	
-	/**
-	 * Required stub.
-	 *
-	 * {@inheritdoc}
-	 *
-	 * @see Plugin::uninstall()
-	 */
-	function uninstall(&$errors) {
-		$errors = array ();
-		parent::uninstall ( $errors );
-	}
-	
-	/**
-	 * Plugins seem to want this.
-	 */
-	public function getForm() {
-		return array ();
 	}
 }
 
