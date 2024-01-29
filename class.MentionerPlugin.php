@@ -112,7 +112,7 @@ class MentionerBackend {
 		// Match every instance of #name in the text
 		if ($this->config->get ( 'notice-hash' ) && $mentions = $this->getMentions ( $text, '#' )) {
 			// Build a recipient list, each unique name will get checked for Staff-ishness
-			$stafflist = new UserList ();
+			$stafflist = new StaffMailingList ();
 			foreach ( $mentions as $idx => $name ) {
 				$staff = $this->convertName ( $name, TRUE );
 				if ($staff instanceof Staff) {
@@ -398,7 +398,7 @@ class MentionerBackend {
 	 * @param UserList $staff
 	 *        	(of Staff objects)
 	 */
-	private function notifyStaffOfMention(ThreadEntry $entry, UserList $recipients) {
+	private function notifyStaffOfMention(ThreadEntry $entry, StaffMailingList $recipients) {
 		// aquire ticket from $entry
 		global $cfg;
 		$ticket = $this->getTicket ( $entry );
@@ -483,4 +483,82 @@ class MentionerBackend {
 	}
 }
 
+
+
+class StaffMailingList extends ListObject
+implements TemplateVariable {
+
+    function add($recipient) {
+        if (!$recipient instanceof Staff)
+            throw new InvalidArgumentException('Staff expected');
+
+        return parent::add($recipient);
+    }
+
+    function addRecipient($contact, $to='to') {
+        return $this->add(new EmailRecipient($contact, $to));
+    }
+
+    function addTo(EmailContact $contact) {
+        return $this->addRecipient($contact, 'to');
+    }
+
+    function addCc(EmailContact $contact) {
+        return $this->addRecipient($contact, 'cc');
+    }
+
+    function addBcc(EmailContact $contact) {
+        return $this->addRecipient($contact, 'bcc');
+    }
+
+    function __toString() {
+        return $this->getNames();
+    }
+
+    // Recipients' email addresses
+    function getEmailAddresses() {
+        $list = array();
+        foreach ($this->storage as $u) {
+            $list[$u->getType()][$u->getId()] = sprintf("%s <%s>",
+                    $u->getName(), $u->getEmail());
+        }
+        return $list;
+    }
+
+    function getNames() {
+        $list = array();
+        foreach($this->storage as $user) {
+            if (is_object($user))
+                $list [] = $user->getName();
+        }
+        return $list ? implode(', ', $list) : '';
+    }
+
+    function getFull() {
+        $list = array();
+        foreach($this->storage as $user) {
+            if (is_object($user))
+                $list[] = sprintf("%s <%s>", $user->getName(), $user->getEmail());
+        }
+
+        return $list ? implode(', ', $list) : '';
+    }
+
+    function getEmails() {
+        $list = array();
+        foreach($this->storage as $user) {
+            if (is_object($user))
+                $list[] = $user->getEmail();
+        }
+        return $list ? implode(', ', $list) : '';
+    }
+
+    static function getVarScope() {
+        return array(
+            'names' => __('List of names'),
+            'emails' => __('List of email addresses'),
+            'full' => __('List of names and email addresses'),
+        );
+    }
+}
 
