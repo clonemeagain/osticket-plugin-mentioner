@@ -401,7 +401,10 @@ class MentionerBackend {
 	private function notifyStaffOfMention(ThreadEntry $entry, UserList $recipients) {
 		// aquire ticket from $entry
 		global $cfg;
-		$ticket = $this->getTicket ( $entry );
+		$object = $entry->getThread()->getObject();
+		if ($object instanceof Ticket) $type = 'ticket';
+		elseif ($object instanceof TaskModel) $type = 'task';
+		else return;
 		
 		$msg = new EmailTemplate ( 0 );
 		$msg->id = 'plugin-fake';
@@ -410,17 +413,17 @@ class MentionerBackend {
 		$msg->ht = [ 
 				'tpl_id' => PHP_INT_MAX - 1, // It's unlikely any normal install would have that many templates... famous last words
 				'code_name' => 'cannedresponse', // HACK: trigger "ticket" root context for the VariableReplacer
-				'subject' => $this->config->get ( 'notice-subject' ),
-				'body' => $this->config->get ( 'notice-template' ),
+				'subject' => $this->config->get ( 'notice-' . $type . '-subject' ),
+				'body' => $this->config->get ( 'notice-' . $type . '-template' ),
 				'updated' => time ()  // We're always updating this template.. :-)
 		];
 		$msg->_group = 3; // HTML Group
 		
-		$dept = $ticket->getDept ();
+		$dept = $object->getDept ();
 		$email = ($dept) ? $dept->getEmail () : $cfg->getDefaultEmail ();
 		$poster = $entry->getPoster ();
 		
-		// Build data for the template processor: (no need to inject $ticket, it does that)
+		// Build data for the template processor: (no need to inject $object, it does that)
 		$vars = [ 
 				'message' => ( string ) $entry,
 				'poster' => $poster,
@@ -428,7 +431,7 @@ class MentionerBackend {
 		];
 		// Use the ticket to convert the template to a message: (replaces variables with content)
 		// Note: $msg->asArray returns subject as subj.. annoying
-		$msg = $ticket->replaceVars ( $msg->asArray (), $vars );
+		$msg = $object->replaceVars ( $msg->asArray (), $vars );
 		$attachments = $cfg->emailAttachments () ? $entry->getAttachments () : array ();
 		$options = [ 
 				'thread' => $entry,
@@ -436,7 +439,7 @@ class MentionerBackend {
 		];
 		// Send to each
 		foreach ( $recipients as $recipient ) {
-			$notice = $ticket->replaceVars ( $msg, array (
+			$notice = $object->replaceVars ( $msg, array (
 					'recipient' => $recipient 
 			) );
 			if (self::DEBUG)

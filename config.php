@@ -83,18 +83,18 @@ class MentionerPluginConfig extends PluginConfig
                 'label' => $__('Notice #Mentions'),
                 'hint' => $__('Sends notices to staff mentioned with #name')
             ]),
-            'notice-subject' => new TextboxField([
-                'label' => $__('Notification Template: Subject'),
-                'hint' => $__('Subject of the notfication message'),
+            'notice-ticket-subject' => new TextboxField([
+                'label' => $__('Notification Ticket Template: Subject'),
+                'hint' => $__('Subject of the notification message from tickets'),
                 'default' => $__('You were mentioned in ticket #%{ticket.number}'),
                 'configuration' => array(
                     'size' => 40,
                     'length' => 256
                 )
             ]),
-            'notice-template' => new TextareaField([
-                'label' => $__('Notification Template: Message'),
-                'hint' => $__('Use variables the same as Internal Note alert'),
+            'notice-ticket-template' => new TextareaField([
+                'label' => $__('Notification Ticket Template: Message'),
+                'hint' => $__('Use variables the same as Internal Activity alert'),
                 'default' => '
 <h3><strong>Hi %{recipient.name.first},</strong></h3>
 						
@@ -104,6 +104,28 @@ class MentionerPluginConfig extends PluginConfig
 <tr> <td> <strong>Subject</strong>: </td> <td> %{ticket.subject} </td> </tr> </tbody></table>
 <br /> %{comments} <br /><br /><hr />
 <p>To view/respond to the ticket, please <a href="%%7Bticket.staff_link%7D"><span style="color:rgb(84, 141, 212)">login</span></a> to the support ticket system<br />
+<em style="font-size:small">Your friendly Customer Support System</em>
+<br /><img src="cid:b56944cb4722cc5cda9d1e23a3ea7fbc" alt="Powered by osTicket" width="126" height="19" style="width:126px" />
+'
+            ]), // not sure if this src id will work for others.. might be better as a plaintext message template.
+            'notice-task-subject' => new TextboxField([
+                'label' => $__('Notification Task Template: Subject'),
+                'hint' => $__('Subject of the notification message from tasks'),
+                'default' => $__('You were mentioned in task #%{task.number}'),
+                'configuration' => array(
+                    'size' => 40,
+                    'length' => 256
+                )
+            ]),
+            'notice-task-template' => new TextareaField([
+                'label' => $__('Notification Task Template: Message'),
+                'hint' => $__('Use variables the same as New Activity alert'),
+                'default' => '
+<h3><strong>Hi %{recipient.name.first},</strong></h3>
+						
+<p>%{poster.name.short} mentioned you in task <a href="%%7Btask.staff_link%7D">#%{task.number}</a></p>
+<br /> %{comments} <br /><br /><hr />
+<p>To view/respond to the task, please <a href="%%7Btask.staff_link%7D"><span style="color:rgb(84, 141, 212)">login</span></a> to the support ticket system<br />
 <em style="font-size:small">Your friendly Customer Support System</em>
 <br /><img src="cid:b56944cb4722cc5cda9d1e23a3ea7fbc" alt="Powered by osTicket" width="126" height="19" style="width:126px" />
 '
