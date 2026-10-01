@@ -112,14 +112,14 @@ class MentionerBackend {
 		// Match every instance of #name in the text
 		if ($this->config->get ( 'notice-hash' ) && $mentions = $this->getMentions ( $text, '#' )) {
 			// Build a recipient list, each unique name will get checked for Staff-ishness
-			$stafflist = new UserList ();
+			$stafflist = array ();
 			foreach ( $mentions as $idx => $name ) {
 				$staff = $this->convertName ( $name, TRUE );
 				if ($staff instanceof Staff) {
 					if (self::DEBUG) {
 						error_log ( "Adding {$staff->getName()} to #notifications list." );
 					}
-					$stafflist->add ( $staff );
+					$stafflist [$staff->getId ()] = $staff;
 				}
 			}
 			if (count ( $stafflist )) {
@@ -395,10 +395,10 @@ class MentionerBackend {
 	 * Uses custom message template defined in plugin config. :-)
 	 *
 	 * @param ThreadEntry $entry        	
-	 * @param UserList $staff
+	 * @param array $staff
 	 *        	(of Staff objects)
 	 */
-	private function notifyStaffOfMention(ThreadEntry $entry, UserList $recipients) {
+	private function notifyStaffOfMention(ThreadEntry $entry, array $recipients) {
 		// aquire ticket from $entry
 		global $cfg;
 		$ticket = $this->getTicket ( $entry );
